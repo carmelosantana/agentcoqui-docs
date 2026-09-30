@@ -8,7 +8,7 @@ import { describe, it } from 'node:test'
 import { fileURLToPath } from 'node:url'
 
 import { anchorsFor, checkContent } from './check-content.mjs'
-import { convertHeadingAnchorTags, publishedSourcePaths, rewriteSourceLinks } from './sync-docs.mjs'
+import { convertHeadingAnchorTags, pointAnchorsAtLandingPage, publishedSourcePaths, rewriteSourceLinks } from './sync-docs.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const projectRoot = path.resolve(__dirname, '..')
@@ -52,6 +52,16 @@ describe('convertHeadingAnchorTags', () => {
     const out = convertHeadingAnchorTags('## <a id="skills-system"></a> 📋 Skills System\n')
     assert.equal(out, '## 📋 Skills System [#skills-system]\n')
     assert.ok(anchorsFor(out).has('skills-system'))
+  })
+})
+
+describe('pointAnchorsAtLandingPage', () => {
+  it('sends anchors the extracted Getting Started section lacks to the landing page', () => {
+    const section = '### Windows\n\nUse [Docker](#docker) or see [Windows](#windows).\n'
+    assert.equal(
+      pointAnchorsAtLandingPage(section),
+      '### Windows\n\nUse [Docker](/#docker) or see [Windows](#windows).\n',
+    )
   })
 })
 
