@@ -194,9 +194,11 @@ export default async function RootLayout({
         <Layout
           navbar={navbar}
           pageMap={await getPageMap()}
-          docsRepositoryBase="https://github.com/carmelosantana/coqui/tree/main/docs"
+          docsRepositoryBase="https://github.com/carmelosantana/agentcoqui-docs"
           footer={footer}
-          editLink="Edit this page on GitHub"
+          // Pages are generated from core docs by scripts/sync-docs.mjs, so there
+          // is no per-page file to edit here; edits belong in carmelosantana/coqui.
+          editLink={null}
           search={search}
           darkMode={true}
           lastUpdated={<LastUpdated locale="en-US">Last updated</LastUpdated>}
