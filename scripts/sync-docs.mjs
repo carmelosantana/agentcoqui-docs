@@ -42,6 +42,8 @@ import path from 'node:path'
 import process from 'node:process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
+import { anchorsFor } from './markdown.mjs'
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const projectRoot = path.resolve(__dirname, '..')
 const contentDir = path.resolve(process.env.COQUI_CONTENT_DIR || path.join(projectRoot, 'content'))
@@ -777,6 +779,18 @@ function writeRoute(route) {
   console.log(`  ✓ ${route.sourcePath} -> ${route.dest}`)
 }
 
+/**
+ * Getting Started is a section extracted from the README, so `#anchor` links
+ * to other README sections have no target on that page. Point them at the
+ * landing page, which carries the whole README.
+ */
+export function pointAnchorsAtLandingPage(section) {
+  const local = anchorsFor(section)
+  return mapOutsideCode(section, text => text.replace(/\]\(#([^)\s]+)\)/g, (match, anchor) => (
+    local.has(anchor) ? match : `](${README_ROUTE}#${anchor})`
+  )))
+}
+
 function syncLandingPages() {
   if (!fs.existsSync(coquiReadme())) {
     return 0
@@ -791,7 +805,7 @@ function syncLandingPages() {
 
   const gettingStartedSection = extractTopLevelSection(readmeContent, 'Quick Start|Installation|Getting Started')
   const gettingStarted = gettingStartedSection
-    ? gettingStartedSection
+    ? pointAnchorsAtLandingPage(gettingStartedSection)
     : 'See the [Introduction](/) for installation and quick start instructions.'
 
   const gettingStartedContent = `---\ntitle: ${yamlString('Getting Started')}\n---\n\n# Getting Started\n\n${gettingStarted}\n`

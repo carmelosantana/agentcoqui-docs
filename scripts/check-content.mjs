@@ -22,87 +22,14 @@ import path from 'node:path'
 import process from 'node:process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
+import { anchorsFor, stripCode } from './markdown.mjs'
+import { publishedSourcePaths } from './sync-docs.mjs'
+
+export { anchorsFor }
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const projectRoot = path.resolve(__dirname, '..')
 const coquiRepoUrl = (process.env.COQUI_REPO_URL || 'https://github.com/carmelosantana/coqui').replace(/\/$/, '')
-
-/** Removes fenced code blocks and inline code spans, keeping line count. */
-export function stripCode(markdown) {
-  const out = []
-  let fence = null
-  for (const line of markdown.split('\n')) {
-    const marker = line.trim().match(/^(`{3,}|~{3,})/)
-    if (fence) {
-      if (marker && marker[1][0] === fence[0] && marker[1].length >= fence.length && line.trim() === marker[1]) {
-        fence = null
-      }
-      out.push('')
-      continue
-    }
-    if (marker) {
-      fence = marker[1]
-      out.push('')
-      continue
-    }
-    out.push(line.replace(/`[^`\n]*`/g, ''))
-  }
-  return out.join('\n')
-}
-
-/** github-slugger compatible slug for a heading's rendered text. */
-export function slugify(text) {
-  return text
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}\p{M}\p{Pc}\- ]/gu, '')
-    .replace(/ /g, '-')
-}
-
-/** Rendered text of a Markdown heading (links, code, emphasis, tags stripped). */
-export function headingText(raw) {
-  return raw
-    .replace(/<[^>]+>/g, '')
-    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
-    .replace(/`([^`]*)`/g, '$1')
-    .replace(/(\*\*|__|\*|_)(\S[\s\S]*?\S|\S)\1/g, '$2')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&amp;/g, '&')
-    .trim()
-}
-
-export function anchorsFor(markdown) {
-  const anchors = new Set()
-  const seen = new Map()
-  let fence = null
-  for (const line of markdown.split('\n')) {
-    const marker = line.trim().match(/^(`{3,}|~{3,})/)
-    if (fence) {
-      if (marker && marker[1][0] === fence[0] && line.trim() === marker[1]) {
-        fence = null
-      }
-      continue
-    }
-    if (marker) {
-      fence = marker[1]
-      continue
-    }
-    const heading = line.match(/^#{1,6}\s+(.+?)\s*#*\s*$/)
-    if (!heading) {
-      continue
-    }
-    // Nextra custom heading id: `## Title [#id]`.
-    const custom = heading[1].match(/\[#([^\]\s]+)\]$/)
-    if (custom) {
-      anchors.add(custom[1])
-      continue
-    }
-    const base = slugify(headingText(heading[1]))
-    const count = seen.get(base) ?? 0
-    seen.set(base, count + 1)
-    anchors.add(count === 0 ? base : `${base}-${count}`)
-  }
-  return anchors
-}
 
 function listPages(contentDir) {
   const pages = new Map()
@@ -194,11 +121,7 @@ function parseArgs(argv) {
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const args = parseArgs(process.argv.slice(2))
-  let published = args.published
-  if (published.length === 0) {
-    const { publishedSourcePaths } = await import('./sync-docs.mjs')
-    published = publishedSourcePaths()
-  }
+  const published = args.published.length > 0 ? args.published : publishedSourcePaths()
   const problems = checkContent({ contentDir: args.content, coquiSnapshot: args.coqui, publishedSources: published })
   if (problems.length > 0) {
     console.error(`Found ${problems.length} broken or misrouted link(s):\n`)
