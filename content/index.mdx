@@ -29,23 +29,23 @@ Join the [Discord community](https://discord.gg/TaCpZVqbbT) to follow along, ask
 
 ## Features
 
-- 🤖 [**Multi-Model Orchestration**](https://github.com/carmelosantana/coqui/blob/main/docs/FEATURES.md#multi-model-orchestration) — route tasks to the right model with automatic failover
-- 🔀 [**Agent Delegation**](https://github.com/carmelosantana/coqui/blob/main/docs/FEATURES.md#child-agent-delegation) — spawn specialized agents (coder, researcher, planner, reviewer, muse, philosopher) with role-appropriate models
-- 🧠 [**Memory Persistence**](https://github.com/carmelosantana/coqui/blob/main/docs/FEATURES.md#memory-persistence) — cross-session memory with SQLite, FTS5, and optional vector embeddings
-- 📦 [**Runtime Extensibility**](https://github.com/carmelosantana/coqui/blob/main/docs/FEATURES.md#runtime-extensibility) — install Composer toolkits at runtime; browse [coqui.space](https://agentcoqui.com)
-- 🔐 [**Credential Management**](https://github.com/carmelosantana/coqui/blob/main/docs/FEATURES.md#credential-management) — declarative `.env`-based secrets with hot-reload and automatic guards
-- 📋 [**Skills System**](https://github.com/carmelosantana/coqui/blob/main/docs/FEATURES.md#skills-system) — teach Coqui any workflow with plain Markdown files — no code required
-- ⏰ [**Scheduled Tasks**](https://github.com/carmelosantana/coqui/blob/main/docs/FEATURES.md#scheduled-tasks) — cron-style automation with circuit breakers
-- 🏗️ [**Background Tasks**](https://github.com/carmelosantana/coqui/blob/main/docs/FEATURES.md#background-tasks) — isolated processes for long-running work
-- 🔁 [**Loops**](https://github.com/carmelosantana/coqui/blob/main/docs/FEATURES.md#loops) — fully automated multi-iteration workflows chaining roles in sequence
-- 🧩 [**Cognitive Flexibility**](https://github.com/carmelosantana/coqui/blob/main/docs/FEATURES.md#cognitive-flexibility) — creative muse and philosopher roles, diverge-converge loops, sketch/hypothesis artifacts
-- 🗂️ [**Artifacts & Plans**](https://github.com/carmelosantana/coqui/blob/main/docs/FEATURES.md#artifacts-and-plans) — versioned plan artifacts with draft→review→final lifecycle
-- 🔧 [**Toolkit Visibility**](https://github.com/carmelosantana/coqui/blob/main/docs/FEATURES.md#toolkit-visibility) — 3-tier model (enabled/stub/disabled) to reduce token usage
-- 🛡️ [**Layered Safety**](https://github.com/carmelosantana/coqui/blob/main/docs/FEATURES.md#layered-safety) — 5-layer security: sandbox → sanitizer → blacklist → approval → audit
-- 🌐 [**HTTP API**](https://github.com/carmelosantana/coqui/blob/main/docs/FEATURES.md#http-api) — async REST + SSE server for dashboards and headless automation
-- 💾 [**Persistent Sessions**](https://github.com/carmelosantana/coqui/blob/main/docs/FEATURES.md#persistent-sessions) — SQLite-backed conversations that survive restarts
-- 👁️ [**Vision Analysis**](https://github.com/carmelosantana/coqui/blob/main/docs/FEATURES.md#vision-analysis) — analyze images from URLs, files, or base64 data
-- 🪶 [**Soul**](https://github.com/carmelosantana/coqui/blob/main/docs/FEATURES.md#soul) — customizable orchestrator identity via `prompts/soul.md`
+- 🤖 [**Multi-Model Orchestration**](/features#multi-model-orchestration) — route tasks to the right model with automatic failover
+- 🔀 [**Agent Delegation**](/features#child-agent-delegation) — spawn specialized agents (coder, explorer, plan, reviewer, muse, philosopher) with role-appropriate models
+- 🧠 [**Memory Persistence**](/features#memory-persistence) — cross-session memory with SQLite, FTS5, and optional vector embeddings
+- 📦 [**Runtime Extensibility**](/features#runtime-extensibility) — install Composer toolkits at runtime; browse [agentcoqui.com](https://agentcoqui.com)
+- 🔐 [**Credential Management**](/features#credential-management) — declarative `.env`-based secrets with hot-reload and automatic guards
+- 📋 [**Skills System**](/features#skills-system) — teach Coqui any workflow with plain Markdown files — no code required
+- ⏰ [**Scheduled Tasks**](/features#scheduled-tasks) — cron-style automation with circuit breakers
+- 🏗️ [**Background Tasks**](/features#background-tasks) — isolated processes for long-running work
+- 🔁 [**Loops**](/features#loops) — fully automated multi-iteration workflows chaining roles in sequence
+- 🧩 [**Cognitive Flexibility**](/features#cognitive-flexibility) — creative muse and philosopher roles, diverge-converge loops, sketch/hypothesis artifacts
+- 🗂️ [**Artifacts & Plans**](/features#artifacts-and-plans) — versioned plan artifacts with draft→review→final lifecycle
+- 🔧 [**Toolkit Visibility**](/features#toolkit-visibility) — 3-tier model (enabled/stub/disabled) to reduce token usage
+- 🛡️ [**Layered Safety**](/features#layered-safety) — 5-layer security: sandbox → sanitizer → blacklist → approval → audit
+- 🌐 [**HTTP API**](/features#http-api) — async REST + SSE server for dashboards and headless automation
+- 💾 [**Persistent Sessions**](/features#persistent-sessions) — SQLite-backed conversations that survive restarts
+- 👁️ [**Vision Analysis**](/features#vision-analysis) — analyze images from URLs, files, or base64 data
+- 🪶 [**Soul**](/features#soul) — customizable orchestrator identity via `prompts/soul.md`
 
 See [docs/FEATURES.md](/features) for the full feature reference with usage examples and token efficiency strategies.
 
@@ -141,7 +141,7 @@ If a previous session left stale Coqui processes behind, run:
 `cleanup` only targets stale or conflicting Coqui-owned processes for this checkout. It does not blindly kill unrelated PHP processes.
 
 ```txt
- Coqui v0.1.0
+ Coqui v0.0.33
 
  Session  a3f8b2c1
  Model    ollama/glm-4.7-flash:latest

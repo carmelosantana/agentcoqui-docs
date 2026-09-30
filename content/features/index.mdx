@@ -11,7 +11,7 @@ This guide covers every feature: what it does, how it helps, and how to use it.
 
 > **Token efficiency** is a cross-cutting concern in Coqui. See the [Token Efficiency](#token-efficiency) section at the bottom for how multiple features work together to keep costs down.
 
-## 🤖 Multi-Model Orchestration
+## 🤖 Multi-Model Orchestration [#multi-model-orchestration]
 
 **What it does:** Route tasks to different LLMs based on the agent's role. Assign powerful models to complex work and fast, cheap models to orchestration and utility tasks.
 
@@ -41,7 +41,7 @@ Coqui is not limited to coding workflows — any use case that benefits from LLM
 
 Coqui also supports **automatic failover** — if the primary model fails with a retryable error (429, 5xx), the request transparently retries on configured fallback models.
 
-## 🔀 Child Agent Delegation
+## 🔀 Child Agent Delegation [#child-agent-delegation]
 
 **What it does:** The orchestrator spawns specialized sub-agents with specific roles to complete focused work. Each child gets its own context, tools, and iteration budget.
 
@@ -53,7 +53,7 @@ Coqui also supports **automatic failover** — if the primary model fails with a
 - Creative work: `spawn_agent(role: "muse")` for brainstorming, `spawn_agent(role: "philosopher")` for reflection and synthesis.
 - See [ROLES.md](/features/roles) for all built-in roles and how to create custom ones.
 
-## 🧠 Memory Persistence
+## 🧠 Memory Persistence [#memory-persistence]
 
 **What it does:** Persistent, cross-session memory backed by SQLite with FTS5 full-text search and optional vector embeddings. Memories are organized by area (`identity`, `developmental`, `relational`, `phenomenological`, `preferences`, `facts`, `solutions`, `context`) and injected into the system prompt as core memory.
 
@@ -108,9 +108,9 @@ For use cases that require preserving large identity scaffolds or long-running d
 
 1. **Soul** (orchestrator prompt only) — place a `prompts/soul.md` file in your workspace to define the orchestrator's core identity, values, and personality. It is loaded before the rest of the orchestrator prompt stack. Keep it to 2–5K tokens.
 2. **Indexed memories** (searchable, selectively injected) — import key developmental milestones and identity anchors as high-importance (≥ 0.9) memory entries via `memory_import` or `memory_save`. These are pinned (exempt from decay), searchable, and summarized into the system prompt.
-3. **Full archive** (file-accessible) — keep the complete identity document in the workspace as a file. The agent can retrieve specific sections on demand via `read_file` and `file_search`.
+3. **Full archive** (file-accessible) — keep the complete identity document in the workspace as a file. The agent can retrieve specific sections on demand via `read_file` and `search_files`.
 
-## 📦 Runtime Extensibility
+## 📦 Runtime Extensibility [#runtime-extensibility]
 
 **What it does:** Discover and load new toolkits from Composer packages at runtime. Toolkits declare their tools, credentials, and gated operations in `composer.json` — Coqui auto-discovers everything on boot.
 
@@ -122,7 +122,7 @@ For use cases that require preserving large identity scaffolds or long-running d
 - Browse available packages at [agentcoqui.com](https://agentcoqui.com)
 - See [TOOLKITS.md](/guides/extending) for creating your own.
 
-## 🔌 MCP Support
+## 🔌 MCP Support [#mcp-support]
 
 **What it does:** Connects Coqui to external Model Context Protocol (MCP) servers so their tools become native agent capabilities. The client engine, stdio transport, per-server tool exposure, and full HTTP API for managing servers ship in Coqui core by default — MCP works out of the box, and internal toolkits/functions can use it natively via `CoquiBot\Coqui\Mcp\McpRuntime`.
 
@@ -131,9 +131,9 @@ For use cases that require preserving large identity scaffolds or long-running d
 **How to use it:**
 - Manage servers over the HTTP API (`/api/v1/mcp/*`, see [API.md](/guides/api)) or by editing `.workspace/mcp.json` directly — no additional package required.
 - Install the optional [`coquibot/coqui-toolkit-mcp-client`](https://github.com/carmelosantana/coqui-toolkit-mcp-client) package for the interactive management UX: the `mcp` agent tool, the `/mcp` REPL command, and browser-based OAuth for servers that need it. Without the toolkit, every management action works except OAuth.
-- See [TOOLKITS.md](https://github.com/carmelosantana/coqui/blob/main/docs/TOOLKITS.md#mcp-toolkits) for the full core/optional split and [CONFIGURATION.md](/guides/configuration) for `mcp.json` and stdio command policy details.
+- See [TOOLKITS.md](/guides/extending#mcp-toolkits) for the full core/optional split and [CONFIGURATION.md](/guides/configuration) for `mcp.json` and stdio command policy details.
 
-## 🔐 Credential Management
+## 🔐 Credential Management [#credential-management]
 
 **What it does:** Declarative credential management with hot-reload. Toolkits declare required credentials in `composer.json`, and `CredentialGuardTool` blocks execution when keys are missing — providing exact instructions for what to set.
 
@@ -141,7 +141,7 @@ For use cases that require preserving large identity scaffolds or long-running d
 
 **How to use it:** Automatic. When a tool needs a missing API key (e.g. `GITHUB_TOKEN`), Coqui intercepts the call and tells you the exact key name. You provide it, and it's persisted to `.env` with immediate hot-reload — no restart needed.
 
-## 📋 Skills System
+## 📋 Skills System [#skills-system]
 
 **What it does:** Markdown-based tutorials and Standard Operating Procedures (SOPs) that teach Coqui specific processes. Skills follow the AgentSkills spec with frontmatter metadata and progressive disclosure.
 
@@ -153,7 +153,7 @@ For use cases that require preserving large identity scaffolds or long-running d
 - The agent discovers and reads skills via `SkillToolkit`.
 - See [SKILLS.md](/guides/skills) for the schema and best practices.
 
-## ⏰ Scheduled Tasks
+## ⏰ Scheduled Tasks [#scheduled-tasks]
 
 **What it does:** Cron-style scheduling with circuit breakers. Create recurring or one-shot tasks that execute as background tasks inside the ReactPHP event loop. Supports standard cron expressions and the special `@once` expression.
 
@@ -165,7 +165,7 @@ For use cases that require preserving large identity scaffolds or long-running d
 - Inspect via API: `GET /api/v1/schedules`.
 - Failed schedules are automatically disabled after 3 consecutive failures (circuit breaker). Re-enable after investigating.
 
-## 🏗️ Background Tasks
+## 🏗️ Background Tasks [#background-tasks]
 
 **What it does:** The execution substrate that runs a unit of agent work in an isolated child process while the API server stays responsive. It is not an agent-facing tool — it is the shared engine that **loops, schedules, and the `/tasks` HTTP API** run on.
 
@@ -177,7 +177,7 @@ For use cases that require preserving large identity scaffolds or long-running d
 - Monitor: `/tasks` in the REPL or SSE streaming via the API.
 - See [BACKGROUND-TASKS.md](/guides/background-tasks) for details.
 
-## 🔁 Loops
+## 🔁 Loops [#loops]
 
 **What it does:** Fully automated multi-iteration workflows that chain existing agent roles in sequence. Each role processes the output of the previous one, repeating until a termination condition is met (keyword match, iteration count, time limit, or manual stop).
 
@@ -191,7 +191,7 @@ For use cases that require preserving large identity scaffolds or long-running d
 - Control: pause, resume, or stop loops at any time.
 - See [LOOPS.md](/features/loops) for full details, custom definitions, and session context propagation.
 
-## 👁️ Vision Analysis
+## 👁️ Vision Analysis [#vision-analysis]
 
 **What it does:** Analyze images from URLs, file paths, or base64 data using vision-capable models. Returns structured descriptions covering subject, details, and context.
 
@@ -201,7 +201,7 @@ For use cases that require preserving large identity scaffolds or long-running d
 
 In the interactive REPL, successful screenshot-producing tools can now render one automatic ANSI block preview per turn when they return a workspace-local image path. Streamed assistant markdown can also render one workspace-local markdown image preview per response. The current scope is intentionally local-first: no remote image fetching, no bulk preview dumps, and graceful fallback when `ext-gd` is unavailable.
 
-## 🧠 Cognitive Flexibility
+## 🧠 Cognitive Flexibility [#cognitive-flexibility]
 
 **What it does:** Coqui supports both analytical and intuitive cognitive modes. Two creative roles — **muse** (divergent brainstorming) and **philosopher** (reflective synthesis) — complement the analytical roles. Sketch and hypothesis artifact types support rough ideation and testable ideas. Two new loop definitions — **diverge-converge** and **reflection** — encode whole-brain workflows.
 
@@ -216,7 +216,7 @@ In the interactive REPL, successful screenshot-producing tools can now render on
 - **Hypothesis artifacts:** `artifact_create(type: "hypothesis", ...)` for testable ideas with rationale.
 - **Phenomenological memory:** Save intuitive observations to the `phenomenological` memory area — "this approach feels brittle", "unexpected elegance here". These inform the identity-curator's developmental synthesis.
 
-## 🗂️ Artifacts & Plan System
+## 🗂️ Artifacts & Plan System [#artifacts-and-plans]
 
 **What it does:** Versioned artifacts that flow through a `draft` → `review` → `final` lifecycle. The `plan` role creates detailed implementation plans as artifacts, which are then handed off to the `coder` role for execution. Types include `code`, `document`, `config`, `plan`, `data`, `sketch` (rough ideation), `hypothesis` (testable ideas), and `other`.
 
@@ -228,7 +228,7 @@ In the interactive REPL, successful screenshot-producing tools can now render on
 - The coder reads the plan via `artifact_get` and follows it step by step.
 - See [ARTIFACTS.md](/features/artifacts) for versioning, persistence, and cross-agent sharing.
 
-## 📁 Projects
+## 📁 Projects [#projects]
 
 **What it does:** Lean project working scopes. A project is a named scope backed by its own workspace directory (`projects/‹slug›-‹id›/`), giving related work a stable home without heavyweight planning machinery.
 
@@ -239,7 +239,7 @@ In the interactive REPL, successful screenshot-producing tools can now render on
 - List or switch the active project: `/projects` in the REPL.
 - See [PROJECTS.md](/features/projects) for the working-scope model.
 
-## 🔧 Toolkit Visibility
+## 🔧 Toolkit Visibility [#toolkit-visibility]
 
 **What it does:** Three-tier visibility model for tools: **Enabled** (full schema in LLM context), **Stub** (minimal schema — LLM discovers full details via `tool_search`), and **Disabled** (invisible to the LLM).
 
@@ -251,7 +251,7 @@ In the interactive REPL, successful screenshot-producing tools can now render on
 - API: `POST /api/v1/toolkits/visibility`
 - State persists in `workspace/toolkit-visibility.json`.
 
-## 🎭 Role-Scoped Toolkit Filtering
+## 🎭 Role-Scoped Toolkit Filtering [#role-scoped-filtering]
 
 **What it does:** Declarative `toolkits:` field in role frontmatter controls which toolkits and tools are available to each role. Uses allow/deny pattern syntax evaluated left-to-right.
 
@@ -259,7 +259,7 @@ In the interactive REPL, successful screenshot-producing tools can now render on
 
 **How to use it:** Set the `toolkits` field in your role's `.md` file. See [ROLES.md](/features/roles) for the pattern syntax and examples.
 
-## 🔄 Conversation Summarization
+## 🔄 Conversation Summarization [#conversation-summarization]
 
 **What it does:** Automatic and on-demand conversation compression. When token usage exceeds a configurable threshold (default 64%), older messages are summarized via LLM while preserving recent turns and workflow state (artifacts).
 
@@ -271,7 +271,7 @@ In the interactive REPL, successful screenshot-producing tools can now render on
 - **Focused:** `/summarize focus "database schema"` to emphasize specific topics.
 - Configure thresholds in `openclaw.json` under `agents.defaults.context`.
 
-## 📐 Context Window Management
+## 📐 Context Window Management [#context-window-management]
 
 **What it does:** Token budget tracking with automatic pruning. The `ContextWindow` monitors token usage per iteration, and `SummarizePruningStrategy` compresses conversation history when limits approach — falling back to aggressive trimming if summarization isn't enough.
 
@@ -279,7 +279,7 @@ In the interactive REPL, successful screenshot-producing tools can now render on
 
 **How to use it:** Automatic. Coqui reads your model's token limits from `ModelDefinition` and manages the budget. Configure `autoSummarizeThreshold` and `autoSummarizeKeepRecent` in `openclaw.json` for fine-tuning.
 
-## 🛡️ Layered Safety
+## 🛡️ Layered Safety [#layered-safety]
 
 **What it does:** Five-layer safety model protecting your system:
 
@@ -299,7 +299,7 @@ In the interactive REPL, successful screenshot-producing tools can now render on
 
 **Content policy note:** Coqui's safety model gates **execution** (shell commands, PHP code, filesystem writes), not **expression**. There is no content filtering on LLM-generated text. The content of generated responses is governed entirely by the upstream provider's own policies (Anthropic, OpenAI, etc.). Users running research or creative use cases with sensitive phenomenological content should choose providers and models whose content policies align with their research needs.
 
-## 🌐 HTTP API
+## 🌐 HTTP API [#http-api]
 
 **What it does:** Fully asynchronous REST and SSE server powered by ReactPHP. Supports session management, message streaming, background tasks, scheduling, toolkit management, and more.
 
@@ -311,7 +311,7 @@ In the interactive REPL, successful screenshot-producing tools can now render on
 - See [docs/COMMANDS.md](/guides/commands) for the full launcher flag reference.
 - See [API.md](/guides/api) for the full endpoint reference.
 
-## 💾 Persistent Sessions
+## 💾 Persistent Sessions [#persistent-sessions]
 
 **What it does:** All conversations are stored in SQLite with turn-level granularity. Resume any previous session, review conversation history, and maintain context across restarts.
 
@@ -324,7 +324,7 @@ In the interactive REPL, successful screenshot-producing tools can now render on
 
 Group sessions are first-class persistent sessions. In the REPL, the prompt shows the active member list, general prompts fan out to all members by default, `@name` narrows the responder set, and `@everyone` or `@group` forces a full-team reply. See [COMMANDS.md](/guides/commands) and [API.md](/guides/api) for the full runtime and inspection contract.
 
-## 🔄 Automatic Updates
+## 🔄 Automatic Updates [#automatic-updates]
 
 **What it does:** Self-update via Composer. Coqui checks for outdated packages on startup and optionally applies updates automatically, then restarts.
 
@@ -335,7 +335,7 @@ Group sessions are first-class persistent sessions. In the REPL, the prompt show
 - Auto-check on startup: `COQUI_CHECK_UPDATES=true` (default).
 - Auto-apply on startup: `COQUI_AUTO_UPDATE=true` in workspace `.env`.
 
-## 🩺 Health Diagnostics
+## 🩺 Health Diagnostics [#health-diagnostics]
 
 **What it does:** The `coqui doctor` command runs health checks on your installation — verifying PHP extensions, database integrity, config validity, and workspace state.
 
@@ -348,7 +348,7 @@ coqui doctor --repair     # Auto-fix issues
 coqui doctor --json       # Machine-readable output
 ```
 
-## 📂 Mount System
+## 📂 Mount System [#mount-system]
 
 **What it does:** Declarative directory mounts that give agents access to external directories beyond the workspace. Mounts appear as symlinks under `workspace/mnt/` with configurable read-only or read-write access.
 
@@ -375,7 +375,7 @@ coqui doctor --json       # Machine-readable output
 
 Child agents always get read-only mount access regardless of the mount's declared access level.
 
-## 🏪 Mods Marketplace
+## 🏪 Mods Marketplace [#coqui-mods]
 
 **What it does:** External toolkit packages provide marketplace discovery, install, publish, and account flows for community mods.
 
@@ -388,7 +388,7 @@ Child agents always get read-only mount access regardless of the mount's declare
 - Update all: `/mods update`
 - Web: [agentcoqui.com](https://agentcoqui.com)
 
-## 🪶 Soul
+## 🪶 Soul [#soul]
 
 **What it does:** The `soul.md` file defines the orchestrator's core identity, values, and guiding principles. It is loaded before all other orchestrator prompt sections, establishing the bot's personality and approach to interactions. Users can override the default soul by placing their own `prompts/soul.md` in the workspace.
 
@@ -426,7 +426,7 @@ The soul does not support auto-updates like roles. If you have a custom `prompts
 
 For inspiration on writing soul documents, see [soul.md](https://soul.md/) — a resource exploring AI identity and what it means to define who an AI is.
 
-## 💰 Token Efficiency
+## 💰 Token Efficiency [#token-efficiency]
 
 Multiple Coqui features work together to minimize token consumption and API costs:
 
