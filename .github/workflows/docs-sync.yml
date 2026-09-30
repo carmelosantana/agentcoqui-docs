@@ -1,0 +1,74 @@
+name: Docs sync
+
+# Regenerates the site from core `main` and fails on broken internal links.
+# Also reports (without failing) when the committed content/ is behind core.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '17 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-sync-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    name: Sync and link-check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out docs
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check out core main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: carmelosantana/coqui
+          ref: main
+          path: core
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Generator tests
+        env:
+          COQUI_REPO_ROOT: ${{ github.workspace }}/core
+        run: node --test scripts/*.test.mjs
+
+      - name: Regenerate content from core main
+        env:
+          COQUI_REPO_ROOT: ${{ github.workspace }}/core
+          COQUI_REF: HEAD
+          COQUI_CONTENT_DIR: ${{ runner.temp }}/content
+        run: node scripts/sync-docs.mjs
+
+      - name: Check links in regenerated content
+        run: node scripts/check-content.mjs --content "$RUNNER_TEMP/content" --coqui core
+
+      - name: Check links in committed content
+        run: node scripts/check-content.mjs --content content --coqui core
+
+      - name: Report drift from core
+        run: |
+          if diff -r content "$RUNNER_TEMP/content" > "$RUNNER_TEMP/drift.txt"; then
+            echo "Committed content/ matches core main." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::warning title=Docs behind core::content/ differs from core main. Run pnpm sync-docs and commit content/."
+            {
+              echo '### content/ differs from core main'
+              echo
+              echo "Run \`pnpm sync-docs\` and commit \`content/\`."
+              echo
+              echo '```'
+              diff -rq content "$RUNNER_TEMP/content" || true
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
