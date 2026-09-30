@@ -60,7 +60,7 @@ function classifySnippet(snippet: string): string {
   }
 
   if (
-    normalizedSnippet.includes('git clone https://github.com/agentcoqui/coqui.git')
+    /git clone https:\/\/github\.com\/(carmelosantana|agentcoqui)\/coqui\.git/.test(normalizedSnippet)
     && normalizedSnippet.includes('composer install')
   ) {
     return 'development-install'

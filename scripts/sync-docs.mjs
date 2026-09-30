@@ -4,10 +4,20 @@
  * Syncs Coqui documentation and curated examples into the Nextra content/
  * tree and regenerates sidebar metadata.
  *
- * Sources:
- *   - ../../Core/coqui/docs/*.md
- *   - ../../Core/coqui/examples/**
- *   - ../../Core/coqui/README.md for landing pages
+ * Sources (read from a git ref of the core repo, default origin/main):
+ *   - docs/*.md
+ *   - examples/**
+ *   - README.md for landing pages
+ *
+ * Environment:
+ *   COQUI_REPO_ROOT    core git checkout (default ../../Core/coqui)
+ *   COQUI_REF          git ref to publish (default origin/main). Run
+ *                      `git -C <core> fetch` first. COQUI_REF=WORKTREE reads the
+ *                      working tree instead; never commit content/ made that way.
+ *   COQUI_CONTENT_DIR  output directory (default ./content)
+ *   COQUI_REPO_URL     GitHub URL for links to unpublished repo files
+ *
+ * --watch always reads the working tree, for live-editing core docs.
  *
  * Rules:
  *   - Sync only explicitly mapped Markdown docs from coqui/docs
@@ -18,23 +28,36 @@
  *   - Strip source frontmatter and generate Nextra frontmatter locally
  *   - Rewrite internal source links to local routes when a page exists
  *   - Rewrite other repository-relative links to GitHub URLs
- *   - Remove raw heading anchor tags that break Nextra TOC hydration
+ *   - Leave links inside code blocks and inline code untouched
+ *   - Turn raw heading anchor tags (which break Nextra TOC hydration) into
+ *     Nextra custom heading ids, so `#anchor` links keep working
+ *   - Delete anything in content/ this run did not generate, so pages whose
+ *     source was removed from core do not linger
  */
 
+import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import process from 'node:process'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+
+import { anchorsFor } from './markdown.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const projectRoot = path.resolve(__dirname, '..')
-const contentDir = path.join(projectRoot, 'content')
-const defaultCoquiRoot = path.resolve(projectRoot, '..', '..', 'Core', 'coqui')
-const coquiRoot = path.resolve(process.env.COQUI_REPO_ROOT || defaultCoquiRoot)
-const coquiDocs = path.join(coquiRoot, 'docs')
-const coquiExamples = path.join(coquiRoot, 'examples')
-const coquiReadme = path.join(coquiRoot, 'README.md')
+const contentDir = path.resolve(process.env.COQUI_CONTENT_DIR || path.join(projectRoot, 'content'))
+const defaultCoquiRepo = path.resolve(projectRoot, '..', '..', 'Core', 'coqui')
+const coquiRepo = path.resolve(process.env.COQUI_REPO_ROOT || defaultCoquiRepo)
+const coquiRef = process.env.COQUI_REF || 'origin/main'
 const coquiRepoUrl = (process.env.COQUI_REPO_URL || 'https://github.com/carmelosantana/coqui').replace(/\/$/, '')
+
+// The core tree being published: a snapshot of COQUI_REF, or the working tree.
+// Set by main() before any sync; everything below resolves against it.
+let coquiRoot = coquiRepo
+const coquiDocs = () => path.join(coquiRoot, 'docs')
+const coquiExamples = () => path.join(coquiRoot, 'examples')
+const coquiReadme = () => path.join(coquiRoot, 'README.md')
 
 const isVercel = process.env.VERCEL === '1'
 const forceSync = process.env.COQUI_SYNC_DOCS === '1'
@@ -60,22 +83,19 @@ const SECTION_DIRS = [
   'examples/personas',
   'examples/skills',
 ]
-const LEGACY_GENERATED_PATHS = [
-  'commands.mdx',
-  'configuration.mdx',
-  'roles.mdx',
-  'reference',
-  'guides/building-apps.mdx',
-  'guides/testing.mdx',
-  'guides/toolkit-extensibility.mdx',
-]
 
+// Route tables hold paths relative to the core repo root, so they do not
+// depend on where the core tree was materialized.
 function repoPath(...parts) {
-  return path.join(coquiRoot, ...parts)
+  return parts.join('/')
 }
 
 function examplePath(...parts) {
-  return path.join(coquiExamples, ...parts)
+  return ['examples', ...parts].join('/')
+}
+
+function abs(relativePath, root = coquiRoot) {
+  return path.join(root, relativePath)
 }
 
 // Routing decisions only. Page title and description come from the source
@@ -237,7 +257,7 @@ const EXAMPLE_ROUTES = [
     section: 'examples/preferences',
     render: 'code-example',
     language: 'json',
-    lead: 'Copy this file into `personas/your-profile/preferences.json` when you want an outcome-first operator.',
+    lead: 'Copy this file into `personas/your-persona/preferences.json` when you want an outcome-first operator.',
   },
   {
     sourcePath: examplePath('preferences', 'deliberate-operator.json'),
@@ -247,7 +267,7 @@ const EXAMPLE_ROUTES = [
     section: 'examples/preferences',
     render: 'code-example',
     language: 'json',
-    lead: 'Copy this file into `personas/your-profile/preferences.json` when you want a deliberate operator profile.',
+    lead: 'Copy this file into `personas/your-persona/preferences.json` when you want a deliberate operator persona.',
   },
   {
     sourcePath: examplePath('preferences', 'review-heavy.json'),
@@ -257,7 +277,7 @@ const EXAMPLE_ROUTES = [
     section: 'examples/preferences',
     render: 'code-example',
     language: 'json',
-    lead: 'Copy this file into `personas/your-profile/preferences.json` for a terse, review-focused operator.',
+    lead: 'Copy this file into `personas/your-persona/preferences.json` for a terse, review-focused operator.',
   },
   {
     sourcePath: examplePath('preferences', 'security-cautious.md'),
@@ -267,7 +287,7 @@ const EXAMPLE_ROUTES = [
     section: 'examples/preferences',
     render: 'code-example',
     language: 'md',
-    lead: 'Use this as `personas/your-profile/security.md` when you want tighter approval boundaries.',
+    lead: 'Use this as `personas/your-persona/security.md` when you want tighter approval boundaries.',
   },
   {
     sourcePath: examplePath('preferences', 'security-high-autonomy.md'),
@@ -277,7 +297,7 @@ const EXAMPLE_ROUTES = [
     section: 'examples/preferences',
     render: 'code-example',
     language: 'md',
-    lead: 'Use this as `personas/your-profile/security.md` when you want faster execution with explicit risk boundaries.',
+    lead: 'Use this as `personas/your-persona/security.md` when you want faster execution with explicit risk boundaries.',
   },
   {
     sourcePath: examplePath('personas', 'deliberate-operator', 'soul.md'),
@@ -291,9 +311,9 @@ const EXAMPLE_ROUTES = [
     ],
     dest: 'examples/personas/deliberate-operator.mdx',
     title: 'Deliberate Operator',
-    description: 'Complete profile example with soul, backstory, preferences, security, and sample response.',
+    description: 'Complete persona example with soul, backstory, preferences, security, and sample response.',
     section: 'examples/personas',
-    render: 'profile-example',
+    render: 'persona-example',
   },
   {
     sourcePath: examplePath('say-hello', 'SKILL.md'),
@@ -322,9 +342,20 @@ const exampleRoutesBySection = new Map([
 ])
 
 const allRoutes = [...DOC_ROUTES, ...EXAMPLE_ROUTES]
-const routePathBySourcePath = new Map(
-  allRoutes.flatMap(route => collectRouteSources(route).map(source => [path.resolve(source), routePath(route.dest)]))
-)
+const README_ROUTE = '/'
+const routePathBySourcePath = new Map([
+  ['README.md', README_ROUTE],
+  ...allRoutes.flatMap(route => collectRouteSources(route).map(source => [source, routePath(route.dest)])),
+])
+
+/**
+ * Core-relative paths of the docs the site publishes as pages. A GitHub link
+ * to one of these is a missed internal route. (Example pages deliberately
+ * link their raw source files on GitHub, so examples are not listed.)
+ */
+export function publishedSourcePaths() {
+  return ['README.md', ...DOC_ROUTES.map(route => route.sourcePath)]
+}
 
 function collectRouteSources(route) {
   return [route.sourcePath, ...(route.aliases || [])]
@@ -335,8 +366,8 @@ function routePath(dest) {
   return `/${withoutExt.replace(/\/index$/, '')}`
 }
 
-function repoUrlForPath(absPath) {
-  const relative = path.relative(coquiRoot, absPath).replace(/\\/g, '/')
+function repoUrlForPath(absPath, root = coquiRoot) {
+  const relative = path.relative(root, absPath).replace(/\\/g, '/')
   const exists = fs.existsSync(absPath)
   const isDir = exists ? fs.statSync(absPath).isDirectory() : false
   const base = isDir ? 'tree' : 'blob'
@@ -404,8 +435,13 @@ function stripLeadingH1(content) {
   return content.replace(/^# .+\n+/, '')
 }
 
-function stripHeadingAnchorTags(content) {
-  return content.replace(/^(#{1,6})\s+<a id=(['"]).*?\2><\/a>\s*/gm, '$1 ')
+/**
+ * `## <a id="x"></a> Title` breaks Nextra's TOC hydration, but other pages
+ * link to `#x`. Nextra's custom heading id syntax (`## Title [#x]`) keeps the
+ * anchor without the raw tag.
+ */
+export function convertHeadingAnchorTags(content) {
+  return content.replace(/^(#{1,6})[ \t]+<a id=(['"])(.*?)\2><\/a>[ \t]*(.*?)[ \t]*$/gm, '$1 $4 [#$3]')
 }
 
 function stripHtmlComments(content) {
@@ -482,24 +518,54 @@ function convertGitHubAlerts(content) {
   return `import { Callout } from 'nextra/components'\n\n${replaced}`
 }
 
-function rewriteSourceLinks(content, sourcePath) {
-  return content.replace(/\]\(([^)\s]+)(#[^)]+)?\)/g, (match, target, anchor = '') => {
-    if (/^(https?:|mailto:|tel:|\/|#)/.test(target)) {
+/**
+ * Applies fn to every part of a Markdown document that is not code: fenced
+ * blocks and inline code spans are passed through untouched, because links
+ * there are illustrative text, not navigation.
+ */
+function mapOutsideCode(content, fn) {
+  let fence = null
+  return content
+    .split('\n')
+    .map(line => {
+      const marker = line.trim().match(/^(`{3,}|~{3,})/)
+      if (fence) {
+        if (marker && marker[1][0] === fence[0] && marker[1].length >= fence.length && line.trim() === marker[1]) {
+          fence = null
+        }
+        return line
+      }
+      if (marker) {
+        fence = marker[1]
+        return line
+      }
+      return line
+        .split(/(`[^`\n]*`)/g)
+        .map(part => (part.startsWith('`') ? part : fn(part)))
+        .join('')
+    })
+    .join('\n')
+}
+
+export function rewriteSourceLinks(content, sourcePath, root = coquiRoot) {
+  return mapOutsideCode(content, text => text.replace(/\]\(([^)\s#]+)(#[^)\s]+)?\)/g, (match, target, anchor = '') => {
+    if (/^(https?:|mailto:|tel:|\/)/.test(target)) {
       return match
     }
 
     const resolved = path.resolve(path.dirname(sourcePath), target.replace(/\/$/, ''))
-    const internalRoute = routePathBySourcePath.get(resolved)
+    const relative = path.relative(root, resolved).replace(/\\/g, '/')
+    if (relative.startsWith('..') || path.isAbsolute(relative)) {
+      return match
+    }
+
+    const internalRoute = routePathBySourcePath.get(relative)
     if (internalRoute) {
       return `](${internalRoute}${anchor})`
     }
 
-    if (resolved.startsWith(coquiRoot)) {
-      return `](${repoUrlForPath(resolved)}${anchor})`
-    }
-
-    return match
-  })
+    return `](${repoUrlForPath(resolved, root)}${anchor})`
+  }))
 }
 
 function processMarkdown(content, sourcePath, options = {}) {
@@ -508,7 +574,7 @@ function processMarkdown(content, sourcePath, options = {}) {
     processed = stripLeadingH1(processed)
   }
   processed = stripHtmlComments(processed)
-  processed = stripHeadingAnchorTags(processed)
+  processed = convertHeadingAnchorTags(processed)
   processed = escapeMdxUnsafeAngles(processed)
   processed = convertGitHubAlerts(processed)
   processed = rewriteSourceLinks(processed, sourcePath)
@@ -583,18 +649,17 @@ function markdownSourceLink(absPath, label) {
 }
 
 function buildMarkdownPage(route) {
-  const raw = readText(route.sourcePath)
-  return `${buildFrontmatter(route)}${processMarkdown(raw, route.sourcePath, { stripFirstHeading: route.stripFirstHeading })}\n`
+  const raw = readText(abs(route.sourcePath))
+  return `${buildFrontmatter(route)}${processMarkdown(raw, abs(route.sourcePath), { stripFirstHeading: route.stripFirstHeading })}\n`
 }
 
 function buildCodeExamplePage(route) {
-  const raw = readText(route.sourcePath)
-  const relative = path.relative(coquiRoot, route.sourcePath).replace(/\\/g, '/')
+  const raw = readText(abs(route.sourcePath))
   const lines = [
     buildFrontmatter(route),
     route.lead,
     '',
-    `Source: ${markdownSourceLink(route.sourcePath, relative)}`,
+    `Source: ${markdownSourceLink(abs(route.sourcePath), route.sourcePath)}`,
     '',
     codeFence(raw, route.language),
     '',
@@ -603,11 +668,12 @@ function buildCodeExamplePage(route) {
 }
 
 function buildToolkitExamplePage(route) {
-  const readme = processMarkdown(readText(route.sourcePath), route.sourcePath, { stripFirstHeading: true })
-  const composerPath = examplePath('hello-toolkit', 'composer.json')
-  const toolkitPath = examplePath('hello-toolkit', 'src', 'HelloToolkit.php')
-  const rootPath = examplePath('hello-toolkit')
-  const srcPath = examplePath('hello-toolkit', 'src')
+  const sourcePath = abs(route.sourcePath)
+  const readme = processMarkdown(readText(sourcePath), sourcePath, { stripFirstHeading: true })
+  const composerPath = abs(examplePath('hello-toolkit', 'composer.json'))
+  const toolkitPath = abs(examplePath('hello-toolkit', 'src', 'HelloToolkit.php'))
+  const rootPath = abs(examplePath('hello-toolkit'))
+  const srcPath = abs(examplePath('hello-toolkit', 'src'))
 
   const lines = [
     buildFrontmatter(route),
@@ -618,7 +684,7 @@ function buildToolkitExamplePage(route) {
     `- ${markdownSourceLink(rootPath, 'examples/hello-toolkit/')}`,
     `- ${markdownSourceLink(srcPath, 'examples/hello-toolkit/src/')}`,
     `- ${markdownSourceLink(composerPath, 'examples/hello-toolkit/composer.json')}`,
-    `- ${markdownSourceLink(route.sourcePath, 'examples/hello-toolkit/README.md')}`,
+    `- ${markdownSourceLink(sourcePath, 'examples/hello-toolkit/README.md')}`,
     `- ${markdownSourceLink(toolkitPath, 'examples/hello-toolkit/src/HelloToolkit.php')}`,
     '',
     '## composer.json',
@@ -634,23 +700,24 @@ function buildToolkitExamplePage(route) {
   return lines.join('\n')
 }
 
-function buildProfileExamplePage(route) {
-  const profileDir = examplePath('personas', 'deliberate-operator')
-  const sampleDir = examplePath('personas', 'deliberate-operator', 'samples')
-  const backstoryPath = examplePath('personas', 'deliberate-operator', 'backstory.md')
-  const preferencesPath = examplePath('personas', 'deliberate-operator', 'preferences.json')
-  const securityPath = examplePath('personas', 'deliberate-operator', 'security.md')
-  const sampleResponsePath = examplePath('personas', 'deliberate-operator', 'samples', 'responses', 'status-update.md')
+function buildPersonaExamplePage(route) {
+  const soulPath = abs(route.sourcePath)
+  const personaDir = abs(examplePath('personas', 'deliberate-operator'))
+  const sampleDir = abs(examplePath('personas', 'deliberate-operator', 'samples'))
+  const backstoryPath = abs(examplePath('personas', 'deliberate-operator', 'backstory.md'))
+  const preferencesPath = abs(examplePath('personas', 'deliberate-operator', 'preferences.json'))
+  const securityPath = abs(examplePath('personas', 'deliberate-operator', 'security.md'))
+  const sampleResponsePath = abs(examplePath('personas', 'deliberate-operator', 'samples', 'responses', 'status-update.md'))
 
   const lines = [
     buildFrontmatter(route),
-    'This example profile bundles a soul, backstory, preferences, security guidance, and one sample response so you can see how a complete profile hangs together.',
+    'This example persona bundles a soul, backstory, preferences, security guidance, and one sample response so you can see how a complete persona hangs together.',
     '',
     '## Source Files',
     '',
-    `- ${markdownSourceLink(profileDir, 'examples/personas/deliberate-operator/')}`,
+    `- ${markdownSourceLink(personaDir, 'examples/personas/deliberate-operator/')}`,
     `- ${markdownSourceLink(sampleDir, 'examples/personas/deliberate-operator/samples/')}`,
-    `- ${markdownSourceLink(route.sourcePath, 'examples/personas/deliberate-operator/soul.md')}`,
+    `- ${markdownSourceLink(soulPath, 'examples/personas/deliberate-operator/soul.md')}`,
     `- ${markdownSourceLink(backstoryPath, 'examples/personas/deliberate-operator/backstory.md')}`,
     `- ${markdownSourceLink(preferencesPath, 'examples/personas/deliberate-operator/preferences.json')}`,
     `- ${markdownSourceLink(securityPath, 'examples/personas/deliberate-operator/security.md')}`,
@@ -658,7 +725,7 @@ function buildProfileExamplePage(route) {
     '',
     '## soul.md',
     '',
-    codeFence(readText(route.sourcePath), 'md'),
+    codeFence(readText(soulPath), 'md'),
     '',
     '## backstory.md',
     '',
@@ -685,8 +752,8 @@ function buildPage(route) {
   switch (route.render) {
     case 'toolkit-example':
       return buildToolkitExamplePage(route)
-    case 'profile-example':
-      return buildProfileExamplePage(route)
+    case 'persona-example':
+      return buildPersonaExamplePage(route)
     case 'code-example':
       return buildCodeExamplePage(route)
     case 'markdown':
@@ -696,32 +763,53 @@ function buildPage(route) {
   }
 }
 
-function writeRoute(route) {
-  const destPath = path.join(contentDir, route.dest)
+// Every file this run writes into content/, so pruneStaleOutputs can remove
+// everything else.
+const writtenFiles = new Set()
+
+function writeContentFile(relativePath, text) {
+  const destPath = path.join(contentDir, relativePath)
   ensureDir(path.dirname(destPath))
-  fs.writeFileSync(destPath, buildPage(route), 'utf8')
-  console.log(`  ✓ ${path.relative(coquiRoot, route.sourcePath).replace(/\\/g, '/')} -> ${route.dest}`)
+  fs.writeFileSync(destPath, text, 'utf8')
+  writtenFiles.add(path.resolve(destPath))
+}
+
+function writeRoute(route) {
+  writeContentFile(route.dest, buildPage(route))
+  console.log(`  ✓ ${route.sourcePath} -> ${route.dest}`)
+}
+
+/**
+ * Getting Started is a section extracted from the README, so `#anchor` links
+ * to other README sections have no target on that page. Point them at the
+ * landing page, which carries the whole README.
+ */
+export function pointAnchorsAtLandingPage(section) {
+  const local = anchorsFor(section)
+  return mapOutsideCode(section, text => text.replace(/\]\(#([^)\s]+)\)/g, (match, anchor) => (
+    local.has(anchor) ? match : `](${README_ROUTE}#${anchor})`
+  )))
 }
 
 function syncLandingPages() {
-  if (!fs.existsSync(coquiReadme)) {
+  if (!fs.existsSync(coquiReadme())) {
     return 0
   }
 
-  let readmeContent = processReadme(readText(coquiReadme))
-  readmeContent = processMarkdown(readmeContent, coquiReadme)
+  let readmeContent = processReadme(readText(coquiReadme()))
+  readmeContent = processMarkdown(readmeContent, coquiReadme())
 
   const indexContent = `---\ntitle: ${yamlString('Coqui Docs')}\n---\n\n${readmeContent}\n`
-  fs.writeFileSync(path.join(contentDir, 'index.mdx'), indexContent, 'utf8')
+  writeContentFile('index.mdx', indexContent)
   console.log('  ✓ README.md -> index.mdx')
 
   const gettingStartedSection = extractTopLevelSection(readmeContent, 'Quick Start|Installation|Getting Started')
   const gettingStarted = gettingStartedSection
-    ? gettingStartedSection
+    ? pointAnchorsAtLandingPage(gettingStartedSection)
     : 'See the [Introduction](/) for installation and quick start instructions.'
 
   const gettingStartedContent = `---\ntitle: ${yamlString('Getting Started')}\n---\n\n# Getting Started\n\n${gettingStarted}\n`
-  fs.writeFileSync(path.join(contentDir, 'getting-started.mdx'), gettingStartedContent, 'utf8')
+  writeContentFile('getting-started.mdx', gettingStartedContent)
   console.log('  ✓ README.md -> getting-started.mdx')
 
   return 2
@@ -734,7 +822,7 @@ function writeMetaFile(relativePath, entries) {
   }
   lines.push('}')
 
-  fs.writeFileSync(path.join(contentDir, relativePath), `${lines.join('\n')}\n`, 'utf8')
+  writeContentFile(relativePath, `${lines.join('\n')}\n`)
 }
 
 function slugForRoute(route) {
@@ -763,7 +851,7 @@ function writeMetaFiles() {
   writeMetaFile('development/_meta.js', routesBySection.get('development').map(route => [slugForRoute(route), route.title]))
   writeMetaFile('examples/_meta.js', [
     ['toolkit', 'Toolkit'],
-    ['personas', 'Profiles'],
+    ['personas', 'Personas'],
     ['preferences', 'Preferences'],
     ['skills', 'Skills'],
   ])
@@ -774,11 +862,11 @@ function writeMetaFiles() {
 }
 
 function validateSourceDocs() {
-  if (!fs.existsSync(coquiDocs)) {
-    throw new Error(`Coqui docs directory not found at ${coquiDocs}`)
+  if (!fs.existsSync(coquiDocs())) {
+    throw new Error(`Coqui docs directory not found at ${coquiDocs()}`)
   }
 
-  const docsInRoot = fs.readdirSync(coquiDocs, { withFileTypes: true })
+  const docsInRoot = fs.readdirSync(coquiDocs(), { withFileTypes: true })
     .filter(entry => entry.isFile())
     .map(entry => entry.name)
     .filter(name => name.endsWith('.md'))
@@ -787,8 +875,8 @@ function validateSourceDocs() {
 
   const mappedFiles = DOC_ROUTES.map(route => path.basename(route.sourcePath)).sort()
   const missingMappings = docsInRoot.filter(name => !mappedFiles.includes(name))
-  const missingSources = DOC_ROUTES.filter(route => !fs.existsSync(route.sourcePath)).map(route => path.relative(coquiRoot, route.sourcePath).replace(/\\/g, '/'))
-  const missingExampleSources = EXAMPLE_ROUTES.filter(route => !fs.existsSync(route.sourcePath)).map(route => path.relative(coquiRoot, route.sourcePath).replace(/\\/g, '/'))
+  const missingSources = DOC_ROUTES.filter(route => !fs.existsSync(abs(route.sourcePath))).map(route => route.sourcePath)
+  const missingExampleSources = EXAMPLE_ROUTES.filter(route => !fs.existsSync(abs(route.sourcePath))).map(route => route.sourcePath)
 
   if (missingMappings.length > 0) {
     throw new Error(`New docs require route mappings: ${missingMappings.join(', ')}`)
@@ -812,8 +900,8 @@ function validateSourceDocs() {
  */
 function resolveRouteMetadata() {
   for (const route of DOC_ROUTES) {
-    const relative = path.relative(coquiRoot, route.sourcePath).replace(/\\/g, '/')
-    const front = parseFrontmatter(readText(route.sourcePath))
+    const relative = route.sourcePath
+    const front = parseFrontmatter(readText(abs(route.sourcePath)))
     const title = route.titleOverride ?? front.title
     const description = route.descriptionOverride ?? front.description
 
@@ -830,15 +918,25 @@ function resolveRouteMetadata() {
   }
 }
 
-function pruneLegacyOutputs() {
-  for (const relativePath of LEGACY_GENERATED_PATHS) {
-    const fullPath = path.join(contentDir, relativePath)
-    if (!fs.existsSync(fullPath)) {
+/**
+ * content/ is entirely generated, so anything this run did not write is a
+ * page whose source is gone from core (or a route that was renamed).
+ */
+function pruneStaleOutputs(dir = contentDir) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const fullPath = path.join(dir, entry.name)
+    if (entry.isDirectory()) {
+      pruneStaleOutputs(fullPath)
+      if (fs.readdirSync(fullPath).length === 0) {
+        fs.rmdirSync(fullPath)
+      }
       continue
     }
 
-    fs.rmSync(fullPath, { recursive: true, force: true })
-    console.log(`  ⊘ removed legacy generated path ${relativePath}`)
+    if (!writtenFiles.has(path.resolve(fullPath))) {
+      fs.rmSync(fullPath, { force: true })
+      console.log(`  ⊘ removed stale ${path.relative(contentDir, fullPath).replace(/\\/g, '/')}`)
+    }
   }
 }
 
@@ -852,8 +950,7 @@ function syncDocsOnce() {
     ensureDir(path.join(contentDir, dir))
   }
 
-  pruneLegacyOutputs()
-
+  writtenFiles.clear()
   let syncedCount = syncLandingPages()
 
   for (const route of DOC_ROUTES) {
@@ -867,6 +964,7 @@ function syncDocsOnce() {
   }
 
   writeMetaFiles()
+  pruneStaleOutputs()
 
   console.log(`\nDone. Synced ${syncedCount} pages.`)
 }
@@ -908,8 +1006,8 @@ function startWatchMode() {
   }
 
   const watchDirs = [
-    ...collectDirectories(coquiDocs),
-    ...collectDirectories(coquiExamples),
+    ...collectDirectories(coquiDocs()),
+    ...collectDirectories(coquiExamples()),
   ]
 
   for (const dir of watchDirs) {
@@ -929,12 +1027,12 @@ function startWatchMode() {
     watchers.push(watcher)
   }
 
-  const readmeWatcher = fs.watch(coquiReadme, { persistent: true }, eventType => {
+  const readmeWatcher = fs.watch(coquiReadme(), { persistent: true }, eventType => {
     queueSync(`${eventType}:README.md`)
   })
   watchers.push(readmeWatcher)
 
-  console.log(`Watching ${coquiDocs}, ${coquiExamples}, and README.md for source changes...`)
+  console.log(`Watching ${coquiDocs()}, ${coquiExamples()}, and README.md for source changes...`)
 
   const stopWatching = () => {
     for (const watcher of watchers) {
@@ -946,13 +1044,47 @@ function startWatchMode() {
   process.on('SIGTERM', stopWatching)
 }
 
-if (isVercel && !forceSync) {
-  console.log('Skipping docs sync on Vercel (using committed content/ files).')
-  console.log('Set COQUI_SYNC_DOCS=1 to force sync in this environment.')
-  process.exit(0)
+/**
+ * Materializes the core tree at `ref` into a temp directory (index + checkout,
+ * so `export-ignore` attributes do not drop files the way `git archive` would).
+ */
+function snapshotCoqui(repo, ref) {
+  const git = (...args) => execFileSync('git', ['-C', repo, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
+  let sha
+  try {
+    sha = git('rev-parse', '--verify', `${ref}^{commit}`)
+  } catch {
+    throw new Error(`Cannot resolve core ref "${ref}" in ${repo}. Run \`git -C ${repo} fetch\`, or set COQUI_REF.`)
+  }
+
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'coqui-docs-src-'))
+  const tree = path.join(dir, 'tree')
+  const env = { ...process.env, GIT_INDEX_FILE: path.join(dir, 'index') }
+  execFileSync('git', ['-C', repo, 'read-tree', sha], { env })
+  execFileSync('git', ['-C', repo, 'checkout-index', '--all', `--prefix=${tree}${path.sep}`], { env })
+  return { dir, tree, sha }
 }
 
-try {
+function main() {
+  if (isVercel && !forceSync) {
+    console.log('Skipping docs sync on Vercel (using committed content/ files).')
+    console.log('Set COQUI_SYNC_DOCS=1 to force sync in this environment.')
+    return
+  }
+
+  const useWorkingTree = watchMode || coquiRef === 'WORKTREE'
+  let snapshot = null
+
+  if (useWorkingTree) {
+    coquiRoot = coquiRepo
+    console.log(`Reading core from the working tree at ${coquiRepo}. Do not commit content/ generated this way.\n`)
+  } else {
+    snapshot = snapshotCoqui(coquiRepo, coquiRef)
+    coquiRoot = snapshot.tree
+    process.on('exit', () => fs.rmSync(snapshot.dir, { recursive: true, force: true }))
+    console.log(`Reading core from ${coquiRef} (${snapshot.sha.slice(0, 7)}) in ${coquiRepo}\n`)
+  }
+
   if (!skipInitial) {
     syncDocsOnce()
   }
@@ -960,7 +1092,13 @@ try {
   if (watchMode) {
     startWatchMode()
   }
-} catch (error) {
-  console.error(`ERROR: ${error.message}`)
-  process.exit(1)
+}
+
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+  try {
+    main()
+  } catch (error) {
+    console.error(`ERROR: ${error.message}`)
+    process.exit(1)
+  }
 }
